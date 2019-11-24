@@ -1,9 +1,13 @@
 {
   "name": "svgshot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/index.js",
   "bin": {
     "svgshot": "dist/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Zemnmez/svgshot.git"
   },
   "license": "MIT",
   "dependencies": {
