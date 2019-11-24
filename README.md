@@ -12,13 +12,13 @@ Example
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~      bash
-svgshot https://google.com
-# loading https://google.com
-# writing Google.svg
+svgshot https://en.wikipedia.org
+# loading https://en.wikipedia.org
+# writing Wikipedia__the_free_encyclopedia.svg
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-[Google SVG]: ./Google.svg
-![Google SVG]
+[Wikipedia SVG]: ./Wikipedia__the_free_encyclopedia.svg
+![Wikipedia SVG]
 
 Installation
 -----------------------------------------------------------------------------
@@ -32,6 +32,11 @@ npm install -g svgshot
 If you don't have `inkscape` installed on windows, try `scoop`:
 ```powershell
 scoop install inkscape
+```
+
+For temporary usage you might want to use `npx`:
+```bash
+npx svgshot https://en.wikipedia.org
 ```
 
 TODO

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import puppeteer from 'puppeteer';
 import * as tmp from 'tmp';
 import { exec } from 'child_process';
