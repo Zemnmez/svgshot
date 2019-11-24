@@ -31,7 +31,6 @@ program
     .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000);
 program.parse(process.argv);
 const { background, width, height, media, scale, timeout } = program;
-console.log(program.urls);
 const args = program.args;
 const isValidMedia = (s) => s == "screen" || s == "print";
 if (!isValidMedia(media))
