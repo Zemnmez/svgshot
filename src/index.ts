@@ -105,6 +105,7 @@ const main = async () => {
     });
 
     await Promise.all(promises);
+    await browser.close();
 }
 
 

@@ -91,5 +91,6 @@ const main = async () => {
         await util_1.promisify(fs_1.writeFile)(fileName, optimSvg.data);
     });
     await Promise.all(promises);
+    await browser.close();
 };
 main().catch(e => { console.error(e); process.exit(1); }).then(() => process.exit(0));
