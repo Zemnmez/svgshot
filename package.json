@@ -5,9 +5,9 @@
   "bin": {
     "svgshot": "dist/index.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:Zemnmez/svgshot.git"
+  "repository": "github:zemnmez/svgshot",
+  "bugs": {
+    "url": "https://github.com/zennmez/svgshot/issues"
   },
   "license": "MIT",
   "dependencies": {

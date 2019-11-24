@@ -20,15 +20,18 @@ const util_1 = require("util");
 const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, }, { removeXMLProcInst: true, }, { removeComments: true, }, { removeMetadata: true, }, { removeTitle: true, }, { removeDesc: true, }, { removeUselessDefs: true, }, { removeEditorsNSData: true, }, { removeEmptyAttrs: true, }, { removeHiddenElems: true, }, { removeEmptyText: true, }, { removeEmptyContainers: true, }, { removeViewBox: false, }, { cleanupEnableBackground: true, }, { convertColors: true, }, { convertPathData: true, }, { convertTransform: true, }, { removeUnknownsAndDefaults: true, }, { removeNonInheritableGroupAttrs: true, }, { removeUselessStrokeAndFill: true, }, { removeUnusedNS: true, }, { cleanupIDs: true, }, { cleanupNumericValues: true, }, { moveElemsAttrsToGroup: true, }, { moveGroupAttrsToElems: true, }, { collapseGroups: true, }, { removeRasterImages: false, }, { mergePaths: true, }, { convertShapeToPath: true, }, { sortAttrs: true, }];
 const program = require('commander');
 program
-    .command('svgshot <urls...>')
+    .name("svgshot")
+    .usage("<urls...>")
     .description('take svg screenshots of webpages. requires the inkscape cli tool')
     .option('-s, --scale <scale>', 'scale of the render. must be between 1 and 2', 1)
     .option('--no-background', 'do not render backgounds')
     .option('--width <width>', 'Width; using px, mm or in (as though printed)', '1000px')
     .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
-    .option('--media <media>', 'CSS @page media', 'screen');
+    .option('--media <media>', 'CSS @page media', 'screen')
+    .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000);
 program.parse(process.argv);
-const { background, width, height, media, scale } = program.commands[0];
+const { background, width, height, media, scale, timeout } = program;
+console.log(program.urls);
 const args = program.args;
 const isValidMedia = (s) => s == "screen" || s == "print";
 if (!isValidMedia(media))
@@ -39,8 +42,20 @@ const main = async () => {
     });
     const promises = args.map(async (url) => {
         console.log("loading", url);
+        const loading = setInterval(() => {
+            console.log("still loading", url);
+        }, timeout / 2);
         const page = await browser.newPage();
-        await page.goto(url, { waitUntil: 'networkidle2' });
+        try {
+            await page.goto(url, {
+                waitUntil: 'networkidle2',
+                timeout
+            });
+        }
+        catch (e) {
+            // if the network doesn't go idle, we still take the screenshot
+        }
+        clearInterval(loading);
         await page.emulateMediaType(media);
         const pdf = await page.pdf({
             scale: scale,

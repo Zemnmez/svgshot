@@ -1,4 +1,4 @@
-.PHONY: build
+.PHONY: build examples
 
 build:
 	yarn tsc

@@ -20,6 +20,9 @@ svgshot https://en.wikipedia.org
 [Wikipedia SVG]: ./Wikipedia__the_free_encyclopedia.svg
 ![Wikipedia SVG]
 
+[Examples directory]: ./examples
+For more examples, take a look at the [Examples directory].
+
 Installation
 -----------------------------------------------------------------------------
 [Installation]: #Installation
