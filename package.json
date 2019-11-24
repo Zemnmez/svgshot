@@ -1,7 +1,10 @@
 {
   "name": "svgshot",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "bin": {
+    "svgshot": "dist/index.js"
+  },
   "license": "MIT",
   "dependencies": {
     "@types/commander": "^2.12.2",
@@ -20,7 +23,7 @@
     "commander": "^4.0.1"
   },
   "scripts": {
-    "start": "make build;node dist/index.js",
+    "start": "make build; node dist/index.js",
     "build": "make build"
   }
 }

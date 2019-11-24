@@ -1,6 +1,6 @@
 import puppeteer from 'puppeteer';
 import * as tmp from 'tmp';
-import { spawn } from 'child_process';
+import { exec } from 'child_process';
 import SVGO from 'svgo'
 import { fstat, exists } from 'fs';
 import { writeFile, readFile } from 'fs';
@@ -12,7 +12,7 @@ const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, },{ removeX
 const program = require('commander');
 program
     .command('svgshot <urls...>')
-    .description('take svg screenshots of webpages')
+    .description('take svg screenshots of webpages. requires the inkscape cli tool')
     .option('-s, --scale <scale>', 'scale of the render. must be between 1 and 2', 1)
     .option('--no-background', 'do not render backgounds')
     .option('--width <width>', 'Width; using px, mm or in (as though printed)', '500px')
@@ -34,7 +34,6 @@ const isValidMedia = (s: string): s is "screen" | "print" =>
     s == "screen" || s == "print";
 
 if (!isValidMedia(media)) throw new Error(`invalid media type ${media}; must be "screen" or "print"`);
-console.log("reached main")
 
 const main = async () => {
     const browser = await puppeteer.launch({
@@ -43,7 +42,7 @@ const main = async () => {
 
 
     const promises = args.map(async (url: string) => {
-        console.log("loading page", url);
+        console.log("loading", url);
         const page = await browser.newPage();
         await page.goto(url, {waitUntil: 'networkidle2'});
         await page.emulateMediaType(media);
@@ -55,7 +54,6 @@ const main = async () => {
             margin: {top: 0, right: 0, left: 0, bottom: 0}
         });
 
-        console.log("setting up inkscape stream");
         const [pdfFile, svgFile] = await Promise.all(['.pdf','.svg'].map(async (extension): Promise<string> => {
             return await new Promise((ok, err) => {
                 tmp.file({ postfix: extension},(error, path) => {
@@ -65,19 +63,15 @@ const main = async () => {
             })
         }));
 
-        await promisify(writeFile)(pdfFile,pdf);
+        await promisify(writeFile)(pdfFile, pdf);
 
+        const line = `inkscape --without-gui ${pdfFile} --export-plain-svg ${svgFile}`;
+        try {
+            await promisify(exec)(line);
+        } catch(e) {
+            throw new Error(`failed to run ${line} with ${e} -- make sure you have inkscape installed and in your PATH`)
+        }
         
-        await new Promise((ok, fail) => {
-            console.log(process.env.PATH);
-            const ink = spawn("inkscape", ["--without-gui", pdfFile, "--export-plain-svg", svgFile], {
-            });
-            ink.stdout.on('data', data => console.log(data));
-            ink.on('close', ok);
-            ink.stderr.on('data', d => console.log(d));
-            ink.on('error', fail);
-        })
-
         const svgo = new SVGO({
             plugins: svgoPlugins
         });
@@ -85,12 +79,12 @@ const main = async () => {
         const title = (await page.title()).replace(/[^A-z_-]/g, "_");
         const fileName = title + ".svg";
 
-        const svgContents = await promisify(readFile)(pdfFile);
-        const optimSvg = await svgo.optimize(svgContents.toString(), {path: pdfFile});
+        const svgContents = await promisify(readFile)(svgFile, 'utf8');
+        const optimSvg = await svgo.optimize(svgContents.toString(), {path: svgFile});
 
 
-        console.log("writing", fileName);
-        await promisify(writeFile)(fileName, optimSvg);
+        console.log(`writing ${fileName} (${width} x ${height})`);
+        await promisify(writeFile)(fileName, optimSvg.data);
     });
 
     await Promise.all(promises);
