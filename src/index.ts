@@ -6,7 +6,7 @@ import { fstat, exists } from 'fs';
 import { writeFile, readFile } from 'fs';
 import { promisify } from 'util';
 
-const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, },{ removeXMLProcInst: true, },{ removeComments: true, },{ removeMetadata: true, },{ removeTitle: true, },{ removeDesc: true, },{ removeUselessDefs: true, },{ removeEditorsNSData: true, },{ removeEmptyAttrs: true, },{ removeHiddenElems: true, },{ removeEmptyText: true, },{ removeEmptyContainers: true, },{ removeViewBox: false, },{ cleanupEnableBackground: true, },{ convertColors: true, },{ convertPathData: true, },{ convertTransform: true, },{ removeUnknownsAndDefaults: true, },{ removeNonInheritableGroupAttrs: true, },{ removeUselessStrokeAndFill: true, },{ removeUnusedNS: true, },{ cleanupIDs: true, },{ cleanupNumericValues: true, },{ moveElemsAttrsToGroup: true, },{ moveGroupAttrsToElems: true, },{ collapseGroups: true, },{ removeRasterImages: false, },{ mergePaths: true, },{ convertShapeToPath: true, },{ sortAttrs: true, },{ removeDimensions: true, }];
+const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, },{ removeXMLProcInst: true, },{ removeComments: true, },{ removeMetadata: true, },{ removeTitle: true, },{ removeDesc: true, },{ removeUselessDefs: true, },{ removeEditorsNSData: true, },{ removeEmptyAttrs: true, },{ removeHiddenElems: true, },{ removeEmptyText: true, },{ removeEmptyContainers: true, },{ removeViewBox: false, },{ cleanupEnableBackground: true, },{ convertColors: true, },{ convertPathData: true, },{ convertTransform: true, },{ removeUnknownsAndDefaults: true, },{ removeNonInheritableGroupAttrs: true, },{ removeUselessStrokeAndFill: true, },{ removeUnusedNS: true, },{ cleanupIDs: true, },{ cleanupNumericValues: true, },{ moveElemsAttrsToGroup: true, },{ moveGroupAttrsToElems: true, },{ collapseGroups: true, },{ removeRasterImages: false, },{ mergePaths: true, },{ convertShapeToPath: true, },{ sortAttrs: true, }];
 
 
 const program = require('commander');
@@ -15,8 +15,8 @@ program
     .description('take svg screenshots of webpages. requires the inkscape cli tool')
     .option('-s, --scale <scale>', 'scale of the render. must be between 1 and 2', 1)
     .option('--no-background', 'do not render backgounds')
-    .option('--width <width>', 'Width; using px, mm or in (as though printed)', '500px')
-    .option('--height <height>', 'Height; using px, mm or in (as though printed)', '500px')
+    .option('--width <width>', 'Width; using px, mm or in (as though printed)', '1000px')
+    .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
     .option('--media <media>', 'CSS @page media', 'screen')
     program.parse(process.argv);
 

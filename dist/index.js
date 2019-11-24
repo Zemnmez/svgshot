@@ -16,15 +16,15 @@ const child_process_1 = require("child_process");
 const svgo_1 = __importDefault(require("svgo"));
 const fs_1 = require("fs");
 const util_1 = require("util");
-const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, }, { removeXMLProcInst: true, }, { removeComments: true, }, { removeMetadata: true, }, { removeTitle: true, }, { removeDesc: true, }, { removeUselessDefs: true, }, { removeEditorsNSData: true, }, { removeEmptyAttrs: true, }, { removeHiddenElems: true, }, { removeEmptyText: true, }, { removeEmptyContainers: true, }, { removeViewBox: false, }, { cleanupEnableBackground: true, }, { convertColors: true, }, { convertPathData: true, }, { convertTransform: true, }, { removeUnknownsAndDefaults: true, }, { removeNonInheritableGroupAttrs: true, }, { removeUselessStrokeAndFill: true, }, { removeUnusedNS: true, }, { cleanupIDs: true, }, { cleanupNumericValues: true, }, { moveElemsAttrsToGroup: true, }, { moveGroupAttrsToElems: true, }, { collapseGroups: true, }, { removeRasterImages: false, }, { mergePaths: true, }, { convertShapeToPath: true, }, { sortAttrs: true, }, { removeDimensions: true, }];
+const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, }, { removeXMLProcInst: true, }, { removeComments: true, }, { removeMetadata: true, }, { removeTitle: true, }, { removeDesc: true, }, { removeUselessDefs: true, }, { removeEditorsNSData: true, }, { removeEmptyAttrs: true, }, { removeHiddenElems: true, }, { removeEmptyText: true, }, { removeEmptyContainers: true, }, { removeViewBox: false, }, { cleanupEnableBackground: true, }, { convertColors: true, }, { convertPathData: true, }, { convertTransform: true, }, { removeUnknownsAndDefaults: true, }, { removeNonInheritableGroupAttrs: true, }, { removeUselessStrokeAndFill: true, }, { removeUnusedNS: true, }, { cleanupIDs: true, }, { cleanupNumericValues: true, }, { moveElemsAttrsToGroup: true, }, { moveGroupAttrsToElems: true, }, { collapseGroups: true, }, { removeRasterImages: false, }, { mergePaths: true, }, { convertShapeToPath: true, }, { sortAttrs: true, }];
 const program = require('commander');
 program
     .command('svgshot <urls...>')
     .description('take svg screenshots of webpages. requires the inkscape cli tool')
     .option('-s, --scale <scale>', 'scale of the render. must be between 1 and 2', 1)
     .option('--no-background', 'do not render backgounds')
-    .option('--width <width>', 'Width; using px, mm or in (as though printed)', '500px')
-    .option('--height <height>', 'Height; using px, mm or in (as though printed)', '500px')
+    .option('--width <width>', 'Width; using px, mm or in (as though printed)', '1000px')
+    .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
     .option('--media <media>', 'CSS @page media', 'screen');
 program.parse(process.argv);
 const { background, width, height, media, scale } = program.commands[0];
@@ -72,7 +72,7 @@ const main = async () => {
         const fileName = title + ".svg";
         const svgContents = await util_1.promisify(fs_1.readFile)(svgFile, 'utf8');
         const optimSvg = await svgo.optimize(svgContents.toString(), { path: svgFile });
-        console.log("writing", fileName);
+        console.log(`writing ${fileName} (${width} x ${height})`);
         await util_1.promisify(fs_1.writeFile)(fileName, optimSvg.data);
     });
     await Promise.all(promises);
