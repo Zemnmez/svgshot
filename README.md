@@ -34,6 +34,12 @@ If you don't have `inkscape` installed on windows, try `scoop`:
 scoop install inkscape
 ```
 
+TODO
+-----------------------------------------------------------------------------
+Replace SVG dimensions with viewBox so they dont get weirdly warped when
+rendered at the wrong size:
+https://gist.github.com/fyrebase/4604f540bc4a329ff3bfde225775d39e
+
 License
 -----------------------------------------------------------------------------
 [License]: #license
