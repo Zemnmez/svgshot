@@ -28,18 +28,48 @@ program
     .option('--width <width>', 'Width; using px, mm or in (as though printed)', '1000px')
     .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
     .option('--media <media>', 'CSS @page media', 'screen')
-    .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000);
+    .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000)
+    .option('--throttle <n>', 'Maximum number of pages to load at once', 10);
 program.parse(process.argv);
-const { background, width, height, media, scale, timeout } = program;
+const { background, width, height, media, scale, timeout, throttle: throttleN } = program;
 const args = program.args;
 const isValidMedia = (s) => s == "screen" || s == "print";
 if (!isValidMedia(media))
     throw new Error(`invalid media type ${media}; must be "screen" or "print"`);
+const map = async function* (f, iter) {
+    let n = 0;
+    for await (let value of iter)
+        yield (await f)(value, n++);
+};
+const chunk = (size) => (iter) => (async function* () {
+    let bucket = [];
+    for await (let value of iter) {
+        bucket.push(value);
+        if (bucket.length == await size) {
+            yield bucket;
+            bucket = [];
+        }
+    }
+})();
+const EventuallyIterable = async function* (I) {
+    for await (let value of I)
+        yield await value;
+};
+/** perform a promise iterator lazily in chunks */
+const chunkedPromise = (N) => (I) => map(v => Promise.all(v), chunk(N)(I));
+;
+const flat = async function* (I) {
+    for await (let chunk of I)
+        for await (let member of chunk)
+            yield member;
+};
+/** lazily completes the given async iterable in chunks of given size */
+const throttle = N => I => flat(EventuallyIterable(chunkedPromise(N)(I)));
 const main = async () => {
     const browser = await puppeteer_1.default.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox'] // unfortunate, but needed to work with wsl...
     });
-    const promises = args.map(async (url) => {
+    const captures = map(async (url, i) => {
         console.log("loading", url);
         const loading = setInterval(() => {
             console.log("still loading", url);
@@ -64,11 +94,11 @@ const main = async () => {
             margin: { top: 0, right: 0, left: 0, bottom: 0 }
         });
         const [pdfFile, svgFile] = await Promise.all(['.pdf', '.svg'].map(async (extension) => {
-            return await new Promise((ok, err) => {
+            return new Promise((ok, err) => {
                 tmp.file({ postfix: extension }, (error, path) => {
                     if (error)
                         return err(error);
-                    ok(path);
+                    return ok(path);
                 });
             });
         }));
@@ -83,14 +113,15 @@ const main = async () => {
         const svgo = new svgo_1.default({
             plugins: svgoPlugins
         });
-        const title = (await page.title()).replace(/[^A-z_-]/g, "_");
+        const title = ((await page.title()).trim() || page.url()).replace(/[^A-z_-]/g, "_");
         const fileName = title + ".svg";
         const svgContents = await util_1.promisify(fs_1.readFile)(svgFile, 'utf8');
         const optimSvg = await svgo.optimize(svgContents.toString(), { path: svgFile });
-        console.log(`writing ${fileName} (${width} x ${height})`);
+        console.log(`writing ${i}/${args.length} ${fileName} (${width} x ${height})`);
         await util_1.promisify(fs_1.writeFile)(fileName, optimSvg.data);
-    });
-    await Promise.all(promises);
+    }, args);
+    for await (let _ of throttle(throttleN)(captures))
+        ;
     await browser.close();
 };
 main().catch(e => { console.error(e); process.exit(1); }).then(() => process.exit(0));

@@ -6,6 +6,7 @@ import SVGO from 'svgo'
 import { fstat, exists } from 'fs';
 import { writeFile, readFile } from 'fs';
 import { promisify } from 'util';
+import { promises } from 'dns';
 
 const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, },{ removeXMLProcInst: true, },{ removeComments: true, },{ removeMetadata: true, },{ removeTitle: true, },{ removeDesc: true, },{ removeUselessDefs: true, },{ removeEditorsNSData: true, },{ removeEmptyAttrs: true, },{ removeHiddenElems: true, },{ removeEmptyText: true, },{ removeEmptyContainers: true, },{ removeViewBox: false, },{ cleanupEnableBackground: true, },{ convertColors: true, },{ convertPathData: true, },{ convertTransform: true, },{ removeUnknownsAndDefaults: true, },{ removeNonInheritableGroupAttrs: true, },{ removeUselessStrokeAndFill: true, },{ removeUnusedNS: true, },{ cleanupIDs: true, },{ cleanupNumericValues: true, },{ moveElemsAttrsToGroup: true, },{ moveGroupAttrsToElems: true, },{ collapseGroups: true, },{ removeRasterImages: false, },{ mergePaths: true, },{ convertShapeToPath: true, },{ sortAttrs: true, }];
 
@@ -21,35 +22,121 @@ program
     .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
     .option('--media <media>', 'CSS @page media', 'screen')
     .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000)
+    .option('--throttle <n>', 'Maximum number of pages to load at once. set to `1` for sequential operation', 10)
     program.parse(process.argv);
 
-const {background, width, height, media, scale, timeout} = (program as {
+const {background, width, height, media, scale, timeout, throttle: throttleN} = (program as {
     background: boolean,
     width: string,
     height: string,
     scale: number,
     media: string,
-    timeout: number
+    timeout: number,
+    throttle: number
 });
 
 const args = program.args as Array<string>;
 
-const isValidMedia = (s: string): s is "screen" | "print" => 
+const isValidMedia = (s: string): s is "screen" | "print" =>
     s == "screen" || s == "print";
 
 if (!isValidMedia(media)) throw new Error(`invalid media type ${media}; must be "screen" or "print"`);
+
+type Eventually<T> =
+    T | Promise<T>;
+
+type EventuallyIterable<T> = Iterable<T> | AsyncIterable<T>
+
+const map:
+    <T,O>(f: Eventually<(v: T, i: number) => Eventually<O>>, v: EventuallyIterable<T>) => EventuallyIterable<O>
+=
+    async function*(f, iter) {
+        let n = 0;
+        for await (let value of iter) yield (await f)(value, n++);
+    }
+;
+
+type RepeatTupleMap<T> = {
+    0: [],
+    1: [T],
+    2: [T,T],
+    3: [T,T,T],
+    4: [T,T,T,T],
+    5: [T,T,T,T,T],
+    6: [T,T,T,T,T,T],
+    7: [T,T,T,T,T,T,T],
+    8: [T,T,T,T,T,T,T,T]
+}
+
+type RepeatTuple<N extends number, T> =
+    N extends keyof RepeatTupleMap<T>? RepeatTupleMap<T>[N]: readonly T[]
+
+
+const chunk:
+    <N extends number>(size: Eventually<N>) => <T>(v: EventuallyIterable<T>) => EventuallyIterable<RepeatTuple<N,T>>
+
+=
+    <N extends number>(size: Eventually<N>) => <T>(iter: EventuallyIterable<T>) => (async function*() {
+        let bucket: T[] = [];
+        for await (let value of iter) {
+            bucket.push(value);
+            if (bucket.length == await size) {
+                yield bucket as RepeatTuple<N,T>;
+                bucket = [];
+            }
+        }
+    })()
+;
+
+const EventuallyIterable:
+    <T>(I: EventuallyIterable<Eventually<T>>) => EventuallyIterable<T>
+=
+    async function*<T>(I: EventuallyIterable<Eventually<T>>): EventuallyIterable<T> {
+        for await (let value of I) yield await value
+    }
+;
+
+/** perform a promise iterator lazily in chunks */
+const chunkedPromise:
+    <N extends number>(N: Eventually<N>) =>
+    <T>(I: EventuallyIterable<T>) => EventuallyIterable<RepeatTuple<N,T>>
+=
+
+    <N extends number>(N: Eventually<N>) =>
+    <T>(I: EventuallyIterable<T>) =>
+        map(v => Promise.all(v) as Promise<RepeatTuple<N,T>>, chunk(N)(I));
+
+;
+
+const flat:
+    <T>(I: EventuallyIterable<EventuallyIterable<T>>) => EventuallyIterable<T>
+=
+    async function*(I) {
+        for await (let chunk of I) for await (let member of chunk) yield member
+    }
+;
+
+/** lazily completes the given async iterable in chunks of given size */
+const throttle:
+    <N extends number>(N:N) =>
+    <T>(I: EventuallyIterable<T>) => EventuallyIterable<T>
+=
+    N => I => flat(EventuallyIterable(chunkedPromise(N)(I)))
+;
+
 
 const main = async () => {
     const browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox'] // unfortunate, but needed to work with wsl...
     });
 
+    const captures = map(async (url, i) => {
+        console.warn("loading", url);
 
-    const promises = args.map(async (url: string) => {
-        console.log("loading", url);
         const loading = setInterval(() => {
-            console.log("still loading", url);
+            console.warn("still loading", url);
         }, timeout / 2);
+
         const page = await browser.newPage();
 
         try {
@@ -72,10 +159,10 @@ const main = async () => {
         });
 
         const [pdfFile, svgFile] = await Promise.all(['.pdf','.svg'].map(async (extension): Promise<string> => {
-            return await new Promise((ok, err) => {
+            return new Promise((ok, err) => {
                 tmp.file({ postfix: extension},(error, path) => {
                     if (error) return err(error);
-                    ok(path);
+                    return ok(path);
                 })
             })
         }));
@@ -88,23 +175,25 @@ const main = async () => {
         } catch(e) {
             throw new Error(`failed to run ${line} with ${e} -- make sure you have inkscape installed and in your PATH`)
         }
-        
+
         const svgo = new SVGO({
             plugins: svgoPlugins
         });
 
-        const title = (await page.title()).replace(/[^A-z_-]/g, "_");
+        const title = ((await page.title()).trim() || page.url()).replace(/[^A-z_-]/g, "_");
         const fileName = title + ".svg";
 
         const svgContents = await promisify(readFile)(svgFile, 'utf8');
         const optimSvg = await svgo.optimize(svgContents.toString(), {path: svgFile});
 
 
-        console.log(`writing ${fileName} (${width} x ${height})`);
+        console.warn(`writing ${i+1}/${args.length} ${fileName} (${width} x ${height})`);
         await promisify(writeFile)(fileName, optimSvg.data);
-    });
 
-    await Promise.all(promises);
+    }, args)
+
+
+    for await (let _ of throttle(throttleN)(captures));
     await browser.close();
 }
 
