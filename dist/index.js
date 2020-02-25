@@ -29,9 +29,11 @@ program
     .option('--height <height>', 'Height; using px, mm or in (as though printed)', '1000px')
     .option('--media <media>', 'CSS @page media', 'screen')
     .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000)
-    .option('--throttle <n>', 'Maximum number of pages to load at once', 10);
+    .option('--throttle <n>', 'Maximum number of pages to load at once. set to `1` for sequential operation', 10)
+    .option('--block', "make text invisible for presentation (it's still in the file though)", false)
+    .option('--headful', "run in a visible chromium instance (useful for debugging). also implicitly retains the chromium instance", false);
 program.parse(process.argv);
-const { background, width, height, media, scale, timeout, throttle: throttleN } = program;
+const { background, width, height, media, scale, timeout, throttle: throttleN, block, headful } = program;
 const args = program.args;
 const isValidMedia = (s) => s == "screen" || s == "print";
 if (!isValidMedia(media))
@@ -67,12 +69,13 @@ const flat = async function* (I) {
 const throttle = N => I => flat(EventuallyIterable(chunkedPromise(N)(I)));
 const main = async () => {
     const browser = await puppeteer_1.default.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'] // unfortunate, but needed to work with wsl...
+        headless: !headful,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] // unfortunate, but needed to work with wsl...
     });
     const captures = map(async (url, i) => {
-        console.log("loading", url);
+        console.warn("loading", url);
         const loading = setInterval(() => {
-            console.log("still loading", url);
+            console.warn("still loading", url);
         }, timeout / 2);
         const page = await browser.newPage();
         try {
@@ -85,6 +88,22 @@ const main = async () => {
             // if the network doesn't go idle, we still take the screenshot
         }
         clearInterval(loading);
+        if (block) {
+            const loading = setInterval(() => {
+                console.warn("waiting for injected style...", url);
+            }, timeout / 2);
+            await page.evaluate(() => {
+                const s = document.createElement("style");
+                s.innerHTML = `* { color: transparent !important }`;
+                document.head.appendChild(s);
+                /*
+                const d = window.document;
+                const y = d.createTreeWalker(d.body, 4);
+                for(;y.nextNode();y.currentNode.textContent=y.currentNode!.textContent!.replace(/\S/g, '…'));
+                */
+            });
+            clearInterval(loading);
+        }
         await page.emulateMediaType(media);
         const pdf = await page.pdf({
             scale: scale,
@@ -117,11 +136,12 @@ const main = async () => {
         const fileName = title + ".svg";
         const svgContents = await util_1.promisify(fs_1.readFile)(svgFile, 'utf8');
         const optimSvg = await svgo.optimize(svgContents.toString(), { path: svgFile });
-        console.log(`writing ${i}/${args.length} ${fileName} (${width} x ${height})`);
+        console.warn(`writing ${i + 1}/${args.length} ${fileName} (${width} x ${height})`);
         await util_1.promisify(fs_1.writeFile)(fileName, optimSvg.data);
     }, args);
     for await (let _ of throttle(throttleN)(captures))
         ;
-    await browser.close();
+    if (!headful)
+        await browser.close();
 };
 main().catch(e => { console.error(e); process.exit(1); }).then(() => process.exit(0));

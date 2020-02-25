@@ -3,10 +3,8 @@ import puppeteer from 'puppeteer';
 import * as tmp from 'tmp';
 import { exec } from 'child_process';
 import SVGO from 'svgo'
-import { fstat, exists } from 'fs';
 import { writeFile, readFile } from 'fs';
 import { promisify } from 'util';
-import { promises } from 'dns';
 
 const svgoPlugins = [{ cleanupAttrs: true, }, { removeDoctype: true, },{ removeXMLProcInst: true, },{ removeComments: true, },{ removeMetadata: true, },{ removeTitle: true, },{ removeDesc: true, },{ removeUselessDefs: true, },{ removeEditorsNSData: true, },{ removeEmptyAttrs: true, },{ removeHiddenElems: true, },{ removeEmptyText: true, },{ removeEmptyContainers: true, },{ removeViewBox: false, },{ cleanupEnableBackground: true, },{ convertColors: true, },{ convertPathData: true, },{ convertTransform: true, },{ removeUnknownsAndDefaults: true, },{ removeNonInheritableGroupAttrs: true, },{ removeUselessStrokeAndFill: true, },{ removeUnusedNS: true, },{ cleanupIDs: true, },{ cleanupNumericValues: true, },{ moveElemsAttrsToGroup: true, },{ moveGroupAttrsToElems: true, },{ collapseGroups: true, },{ removeRasterImages: false, },{ mergePaths: true, },{ convertShapeToPath: true, },{ sortAttrs: true, }];
 
@@ -23,16 +21,20 @@ program
     .option('--media <media>', 'CSS @page media', 'screen')
     .option('--timeout <milliseconds>', 'Maximum time to wait for page to become idle before taking screenshot', 10000)
     .option('--throttle <n>', 'Maximum number of pages to load at once. set to `1` for sequential operation', 10)
+    .option('--block', "make text invisible for presentation (it's still in the file though)", false)
+    .option('--headful', "run in a visible chromium instance (useful for debugging). also implicitly retains the chromium instance", false)
     program.parse(process.argv);
 
-const {background, width, height, media, scale, timeout, throttle: throttleN} = (program as {
+const {background, width, height, media, scale, timeout, throttle: throttleN, block, headful} = (program as {
     background: boolean,
     width: string,
     height: string,
     scale: number,
     media: string,
     timeout: number,
-    throttle: number
+    throttle: number,
+    block: boolean,
+    headful: boolean,
 });
 
 const args = program.args as Array<string>;
@@ -127,7 +129,8 @@ const throttle:
 
 const main = async () => {
     const browser = await puppeteer.launch({
-        args: ['--no-sandbox', '--disable-setuid-sandbox'] // unfortunate, but needed to work with wsl...
+        headless: !headful,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] // unfortunate, but needed to work with wsl...
     });
 
     const captures = map(async (url, i) => {
@@ -149,6 +152,24 @@ const main = async () => {
         }
 
         clearInterval(loading);
+
+        if (block) {
+            const loading = setInterval(() => {
+                console.warn("waiting for injected style...", url)
+            }, timeout / 2)
+            await page.evaluate(() => {
+                const s = document.createElement("style");
+                s.innerHTML=`* { color: transparent !important }`;
+                document.head.appendChild(s);
+                /*
+                const d = window.document;
+                const y = d.createTreeWalker(d.body, 4);
+                for(;y.nextNode();y.currentNode.textContent=y.currentNode!.textContent!.replace(/\S/g, '…'));
+                */
+            })
+            clearInterval(loading);
+        }
+
         await page.emulateMediaType(media);
         const pdf = await page.pdf({
             scale: scale,
@@ -194,7 +215,7 @@ const main = async () => {
 
 
     for await (let _ of throttle(throttleN)(captures));
-    await browser.close();
+    if(!headful) await browser.close();
 }
 
 

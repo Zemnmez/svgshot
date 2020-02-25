@@ -20,8 +20,19 @@ svgshot https://en.wikipedia.org
 [Wikipedia SVG]: ./Wikipedia__the_free_encyclopedia.svg
 ![Wikipedia SVG]
 
+With `--block` for removing text¹:
+
+[Twitch SVG]: ./Twitch.svg
+![Twitch SVG]
+
 [Examples directory]: ./examples
 For more examples, take a look at the [Examples directory].
+
+[BLOKK font]: http://www.blokkfont.com/
+
+¹ Orginally this was intended to block out text like the [BLOKK font], but
+I couldn't do this without creating truly huge SVGs. If you have any ideas
+as to how this could be achieved, let me know!
 
 Installation
 -----------------------------------------------------------------------------
